@@ -319,19 +319,22 @@ function MobileMenu({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
         duration: 0.4,
         ease: 'power3.out',
       })
-      // Stagger menu items
-      gsap.fromTo(
-        contentRef.current?.querySelectorAll('.menu-item'),
-        { opacity: 0, x: -30 },
-        { 
-          opacity: 1, 
-          x: 0, 
-          duration: 0.4, 
-          stagger: 0.08,
-          delay: 0.2,
-          ease: 'power2.out' 
-        }
-      )
+      // Stagger menu items - with null check for TypeScript
+      const menuItems = contentRef.current?.querySelectorAll('.menu-item')
+      if (menuItems && menuItems.length > 0) {
+        gsap.fromTo(
+          menuItems,
+          { opacity: 0, x: -30 },
+          { 
+            opacity: 1, 
+            x: 0, 
+            duration: 0.4, 
+            stagger: 0.08,
+            delay: 0.2,
+            ease: 'power2.out' 
+          }
+        )
+      }
     } else {
       // Animate out
       gsap.to(overlayRef.current, {
@@ -773,11 +776,14 @@ function HeroContent() {
     )
     
     // Index numbers (like KPR Verse 01K, 02P, 03R)
-    .fromTo(indexRef.current?.querySelectorAll('.word-index'),
-      { opacity: 0 },
-      { opacity: 1, duration: 0.4, stagger: 0.15 },
-      '-=0.4'
-    )
+    const wordIndexElements = indexRef.current?.querySelectorAll('.word-index')
+    if (wordIndexElements && wordIndexElements.length > 0) {
+      tl.fromTo(wordIndexElements,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, stagger: 0.15 },
+        '-=0.4'
+      )
+    }
     
     // Title letters
     const letters = titleRef.current?.querySelectorAll('.hero-letter')
