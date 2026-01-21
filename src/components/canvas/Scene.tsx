@@ -54,6 +54,15 @@ function Particles({ count }: ParticlesProps) {
     
     return { positions, colors }
   }, [count])
+
+  // Create buffer attributes with useMemo
+  const positionAttribute = useMemo(() => {
+    return new THREE.BufferAttribute(positions, 3)
+  }, [positions])
+
+  const colorAttribute = useMemo(() => {
+    return new THREE.BufferAttribute(colors, 3)
+  }, [colors])
   
   useFrame((state) => {
     if (pointsRef.current) {
@@ -65,18 +74,8 @@ function Particles({ count }: ParticlesProps) {
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={count}
-          array={positions}
-          itemSize={3}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          count={count}
-          array={colors}
-          itemSize={3}
-        />
+        <primitive object={positionAttribute} attach="attributes-position" />
+        <primitive object={colorAttribute} attach="attributes-color" />
       </bufferGeometry>
       <pointsMaterial
         size={0.03}
@@ -336,7 +335,7 @@ export default function Scene({ className = '' }: SceneProps) {
         gyro.requestPermission()
       }
     }
-  }, [isMobile, hasGyroscope, gyro.permission])
+  }, [isMobile, hasGyroscope, gyro.permission, gyro.requestPermission])
   
   const handleGyroPermission = async () => {
     await gyro.requestPermission()
