@@ -355,18 +355,18 @@ export default function Scene({ className = '' }: SceneProps) {
         background: COLORS.background,
       }}
     >
-      {/* Gyroscope Permission Prompt (iOS) */}
+      {/* Gyroscope Permission Prompt (iOS) - Moved to top */}
       {showGyroPrompt && (
         <div
           onClick={handleGyroPermission}
           style={{
             position: 'absolute',
-            bottom: '15%',
+            top: '120px',
             left: '50%',
             transform: 'translateX(-50%)',
-            zIndex: 100,
+            zIndex: 200,
             padding: '14px 24px',
-            background: 'rgba(13, 13, 13, 0.9)',
+            background: 'rgba(13, 13, 13, 0.95)',
             border: `1px solid ${COLORS.accentPrimary}`,
             borderRadius: '4px',
             cursor: 'pointer',
@@ -377,6 +377,7 @@ export default function Scene({ className = '' }: SceneProps) {
             textTransform: 'uppercase',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
+            boxShadow: `0 0 20px rgba(229, 9, 20, 0.3)`,
           }}
         >
           <span style={{ color: COLORS.accentPrimary }}>TAP</span> TO ENABLE MOTION

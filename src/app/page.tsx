@@ -834,12 +834,13 @@ function HeroContent() {
     <div
       ref={containerRef}
       style={{
-        position: 'relative',
+        position: 'fixed',
+        inset: 0,
         zIndex: 10,
-        minHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         padding: isMobile ? '100px 24px 32px 24px' : '100px 60px 40px 60px',
+        overflow: 'hidden',
       }}
     >
       {/* Mobile: Description at top-right (KPR Verse style) */}
@@ -1040,7 +1041,11 @@ export default function HomePage() {
   }, [])
   
   return (
-    <main style={{ position: 'relative', minHeight: '100dvh', overflow: 'hidden' }}>
+    <main style={{ 
+      position: 'fixed', 
+      inset: 0,
+      overflow: 'hidden',
+    }}>
       {/* 3D Background */}
       <Scene />
       

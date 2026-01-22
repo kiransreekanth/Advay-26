@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 // ============================================
 // DEVICE DETECTION HOOK
@@ -12,6 +12,7 @@ interface DeviceInfo {
   isDesktop: boolean
   hasGyroscope: boolean
   hasTouchScreen: boolean
+  isLowEnd: boolean
   screenWidth: number
   screenHeight: number
 }
@@ -23,8 +24,9 @@ export function useDeviceDetect(): DeviceInfo {
     isDesktop: true,
     hasGyroscope: false,
     hasTouchScreen: false,
-    screenWidth: 1920,
-    screenHeight: 1080,
+    isLowEnd: false,
+    screenWidth: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    screenHeight: typeof window !== 'undefined' ? window.innerHeight : 1080,
   })
 
   useEffect(() => {
@@ -32,14 +34,24 @@ export function useDeviceDetect(): DeviceInfo {
       const width = window.innerWidth
       const height = window.innerHeight
       
+      // Check user agent for mobile
       const userAgent = navigator.userAgent.toLowerCase()
       const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+      
+      // Screen size based detection
       const isMobile = isMobileUA || width < 768
       const isTablet = width >= 768 && width < 1024
       const isDesktop = width >= 1024
       
+      // Touch screen detection
       const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      
+      // Gyroscope detection
       const hasGyroscope = 'DeviceOrientationEvent' in window
+      
+      // Low-end device detection (rough heuristic)
+      const isLowEnd = (navigator.hardwareConcurrency || 4) <= 2 || 
+                       (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 2)
 
       setDeviceInfo({
         isMobile,
@@ -47,6 +59,7 @@ export function useDeviceDetect(): DeviceInfo {
         isDesktop,
         hasGyroscope,
         hasTouchScreen,
+        isLowEnd,
         screenWidth: width,
         screenHeight: height,
       })
@@ -54,6 +67,7 @@ export function useDeviceDetect(): DeviceInfo {
 
     checkDevice()
     window.addEventListener('resize', checkDevice)
+    
     return () => window.removeEventListener('resize', checkDevice)
   }, [])
 
@@ -61,7 +75,7 @@ export function useDeviceDetect(): DeviceInfo {
 }
 
 // ============================================
-// MOUSE PARALLAX HOOK (Desktop)
+// MOUSE PARALLAX HOOK
 // ============================================
 
 interface MousePosition {
@@ -72,7 +86,7 @@ interface MousePosition {
 }
 
 export function useMouseParallax(sensitivity: number = 1): MousePosition {
-  const [position, setPosition] = useState<MousePosition>({
+  const [mousePosition, setMousePosition] = useState<MousePosition>({
     x: 0,
     y: 0,
     normalizedX: 0,
@@ -80,109 +94,144 @@ export function useMouseParallax(sensitivity: number = 1): MousePosition {
   })
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const normalizedX = (e.clientX / window.innerWidth - 0.5) * 2 * sensitivity
-      const normalizedY = (e.clientY / window.innerHeight - 0.5) * 2 * sensitivity
+    const handleMouseMove = (event: MouseEvent) => {
+      const { clientX, clientY } = event
+      const { innerWidth, innerHeight } = window
+      
+      // Normalize to -1 to 1 range
+      const normalizedX = ((clientX / innerWidth) - 0.5) * 2 * sensitivity
+      const normalizedY = ((clientY / innerHeight) - 0.5) * 2 * sensitivity
 
-      setPosition({
-        x: e.clientX,
-        y: e.clientY,
+      setMousePosition({
+        x: clientX,
+        y: clientY,
         normalizedX,
         normalizedY,
       })
     }
 
     window.addEventListener('mousemove', handleMouseMove)
+    
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [sensitivity])
 
-  return position
+  return mousePosition
 }
 
 // ============================================
-// GYROSCOPE HOOK (Mobile)
+// GYROSCOPE HOOK (with iOS permission handling)
 // ============================================
 
 interface GyroscopeData {
-  beta: number   // Front-to-back tilt (-180 to 180)
-  gamma: number  // Left-to-right tilt (-90 to 90)
-  permission: 'granted' | 'denied' | 'pending'
+  alpha: number  // Z-axis rotation (0-360)
+  beta: number   // X-axis rotation (-180 to 180)
+  gamma: number  // Y-axis rotation (-90 to 90)
+  permission: 'pending' | 'granted' | 'denied' | 'not-supported'
   requestPermission: () => Promise<void>
 }
 
 export function useGyroscope(): GyroscopeData {
-  const [data, setData] = useState<GyroscopeData>({
+  const [gyroData, setGyroData] = useState<Omit<GyroscopeData, 'requestPermission'>>({
+    alpha: 0,
     beta: 0,
     gamma: 0,
     permission: 'pending',
-    requestPermission: async () => {},
   })
+  
+  const listenerAddedRef = useRef(false)
 
+  // Handle device orientation event
+  const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
+    setGyroData(prev => ({
+      ...prev,
+      alpha: event.alpha || 0,
+      beta: event.beta || 0,
+      gamma: event.gamma || 0,
+      permission: 'granted',
+    }))
+  }, [])
+
+  // Request permission (required for iOS 13+)
   const requestPermission = useCallback(async () => {
-    // iOS 13+ requires permission request
+    // Check if DeviceOrientationEvent exists
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      setGyroData(prev => ({ ...prev, permission: 'not-supported' }))
+      return
+    }
+
+    // Check if requestPermission method exists (iOS 13+)
     if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
       try {
         const permission = await (DeviceOrientationEvent as any).requestPermission()
-        setData(prev => ({ ...prev, permission }))
-        return permission
+        
+        if (permission === 'granted') {
+          setGyroData(prev => ({ ...prev, permission: 'granted' }))
+          
+          if (!listenerAddedRef.current) {
+            window.addEventListener('deviceorientation', handleOrientation, true)
+            listenerAddedRef.current = true
+          }
+        } else {
+          setGyroData(prev => ({ ...prev, permission: 'denied' }))
+        }
       } catch (error) {
-        setData(prev => ({ ...prev, permission: 'denied' }))
-        return 'denied'
+        console.error('Error requesting gyroscope permission:', error)
+        setGyroData(prev => ({ ...prev, permission: 'denied' }))
       }
     } else {
-      // Android and older iOS - permission granted by default
-      setData(prev => ({ ...prev, permission: 'granted' }))
-      return 'granted'
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      const beta = e.beta || 0
-      const gamma = e.gamma || 0
+      // Non-iOS devices - just add listener directly
+      setGyroData(prev => ({ ...prev, permission: 'granted' }))
       
-      // Normalize to -1 to 1 range
-      const normalizedBeta = Math.max(-1, Math.min(1, beta / 45))
-      const normalizedGamma = Math.max(-1, Math.min(1, gamma / 45))
+      if (!listenerAddedRef.current) {
+        window.addEventListener('deviceorientation', handleOrientation, true)
+        listenerAddedRef.current = true
+      }
+    }
+  }, [handleOrientation])
 
-      setData(prev => ({
-        ...prev,
-        beta: normalizedBeta,
-        gamma: normalizedGamma,
-      }))
+  // Initial setup for non-iOS devices
+  useEffect(() => {
+    // Check if gyroscope is supported
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      setGyroData(prev => ({ ...prev, permission: 'not-supported' }))
+      return
     }
 
-    // Auto-request on Android
+    // For non-iOS devices, try to add listener directly
     if (typeof (DeviceOrientationEvent as any).requestPermission !== 'function') {
-      setData(prev => ({ ...prev, permission: 'granted' }))
-      window.addEventListener('deviceorientation', handleOrientation)
+      // Test if we can get orientation data
+      const testHandler = (event: DeviceOrientationEvent) => {
+        if (event.alpha !== null || event.beta !== null || event.gamma !== null) {
+          setGyroData(prev => ({ ...prev, permission: 'granted' }))
+          
+          if (!listenerAddedRef.current) {
+            window.addEventListener('deviceorientation', handleOrientation, true)
+            listenerAddedRef.current = true
+          }
+        }
+        window.removeEventListener('deviceorientation', testHandler)
+      }
+      
+      window.addEventListener('deviceorientation', testHandler, { once: true })
+      
+      // If no event fires within 1 second, assume not supported or needs permission
+      setTimeout(() => {
+        if (gyroData.permission === 'pending') {
+          // Keep as pending - user might need to interact first
+        }
+      }, 1000)
     }
 
     return () => {
-      window.removeEventListener('deviceorientation', handleOrientation)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (data.permission === 'granted') {
-      const handleOrientation = (e: DeviceOrientationEvent) => {
-        const beta = e.beta || 0
-        const gamma = e.gamma || 0
-        
-        const normalizedBeta = Math.max(-1, Math.min(1, beta / 45))
-        const normalizedGamma = Math.max(-1, Math.min(1, gamma / 45))
-
-        setData(prev => ({
-          ...prev,
-          beta: normalizedBeta,
-          gamma: normalizedGamma,
-        }))
+      if (listenerAddedRef.current) {
+        window.removeEventListener('deviceorientation', handleOrientation, true)
+        listenerAddedRef.current = false
       }
-
-      window.addEventListener('deviceorientation', handleOrientation)
-      return () => window.removeEventListener('deviceorientation', handleOrientation)
     }
-  }, [data.permission])
+  }, [handleOrientation, gyroData.permission])
 
-  return { ...data, requestPermission }
+  return {
+    ...gyroData,
+    requestPermission,
+  }
 }
