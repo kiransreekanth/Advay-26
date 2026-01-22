@@ -367,22 +367,22 @@ export default function Scene({ className = '' }: SceneProps) {
         background: COLORS.background,
       }}
     >
-      {/* Gyroscope Permission Prompt (iOS) - Top left, no border */}
+      {/* Gyroscope Permission Prompt (iOS) - Same level as description */}
       {showGyroPrompt && (
         <button
           onClick={handleGyroPermission}
           style={{
             position: 'absolute',
-            top: '195px',
-            left: '24px',
+            top: '200px',
+            left: '44px',
             zIndex: 200,
-            padding: '12px 0',
+            padding: '0',
             background: 'transparent',
             border: 'none',
             cursor: 'pointer',
             color: COLORS.textPrimary,
             fontFamily: 'system-ui, sans-serif',
-            fontSize: '11px',
+            fontSize: '10px',
             letterSpacing: '0.12em',
             textTransform: 'uppercase',
             textAlign: 'left',
