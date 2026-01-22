@@ -326,20 +326,32 @@ export default function Scene({ className = '' }: SceneProps) {
   
   const [showGyroPrompt, setShowGyroPrompt] = useState(false)
   
-  // Check if iOS needs permission
+  // Check if iOS needs permission - show prompt on mobile
   useEffect(() => {
-    if (isMobile && hasGyroscope && gyro.permission === 'pending') {
-      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+    if (typeof window === 'undefined') return
+    
+    if (isMobile) {
+      // Check if it's iOS that needs explicit permission
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const needsPermission = typeof (DeviceOrientationEvent as any).requestPermission === 'function'
+      
+      if (isIOS && needsPermission && gyro.permission === 'pending') {
         setShowGyroPrompt(true)
-      } else {
+      } else if (!isIOS && gyro.permission === 'pending') {
+        // Android - try to request permission automatically
         gyro.requestPermission()
       }
     }
-  }, [isMobile, hasGyroscope, gyro.permission, gyro.requestPermission])
+  }, [isMobile, gyro.permission, gyro.requestPermission])
   
   const handleGyroPermission = async () => {
-    await gyro.requestPermission()
-    setShowGyroPrompt(false)
+    try {
+      await gyro.requestPermission()
+      setShowGyroPrompt(false)
+    } catch (error) {
+      console.error('Gyro permission error:', error)
+      setShowGyroPrompt(false)
+    }
   }
   
   return (
@@ -355,33 +367,29 @@ export default function Scene({ className = '' }: SceneProps) {
         background: COLORS.background,
       }}
     >
-      {/* Gyroscope Permission Prompt (iOS) - Moved to top */}
+      {/* Gyroscope Permission Prompt (iOS) - Top left, no border */}
       {showGyroPrompt && (
-        <div
+        <button
           onClick={handleGyroPermission}
           style={{
             position: 'absolute',
-            top: '120px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            top: '195px',
+            left: '24px',
             zIndex: 200,
-            padding: '14px 24px',
-            background: 'rgba(13, 13, 13, 0.95)',
-            border: `1px solid ${COLORS.accentPrimary}`,
-            borderRadius: '4px',
+            padding: '12px 0',
+            background: 'transparent',
+            border: 'none',
             cursor: 'pointer',
             color: COLORS.textPrimary,
             fontFamily: 'system-ui, sans-serif',
-            fontSize: '12px',
-            letterSpacing: '0.15em',
+            fontSize: '11px',
+            letterSpacing: '0.12em',
             textTransform: 'uppercase',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            boxShadow: `0 0 20px rgba(229, 9, 20, 0.3)`,
+            textAlign: 'left',
           }}
         >
           <span style={{ color: COLORS.accentPrimary }}>TAP</span> TO ENABLE MOTION
-        </div>
+        </button>
       )}
       
       {/* Three.js Canvas */}

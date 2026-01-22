@@ -156,15 +156,17 @@ export function useGyroscope(): GyroscopeData {
   // Request permission (required for iOS 13+)
   const requestPermission = useCallback(async () => {
     // Check if DeviceOrientationEvent exists
-    if (typeof DeviceOrientationEvent === 'undefined') {
+    if (typeof window === 'undefined' || typeof DeviceOrientationEvent === 'undefined') {
       setGyroData(prev => ({ ...prev, permission: 'not-supported' }))
       return
     }
 
     // Check if requestPermission method exists (iOS 13+)
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+    const DeviceOrientationEventTyped = DeviceOrientationEvent as any
+    
+    if (typeof DeviceOrientationEventTyped.requestPermission === 'function') {
       try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission()
+        const permission = await DeviceOrientationEventTyped.requestPermission()
         
         if (permission === 'granted') {
           setGyroData(prev => ({ ...prev, permission: 'granted' }))
@@ -191,46 +193,15 @@ export function useGyroscope(): GyroscopeData {
     }
   }, [handleOrientation])
 
-  // Initial setup for non-iOS devices
+  // Cleanup on unmount
   useEffect(() => {
-    // Check if gyroscope is supported
-    if (typeof DeviceOrientationEvent === 'undefined') {
-      setGyroData(prev => ({ ...prev, permission: 'not-supported' }))
-      return
-    }
-
-    // For non-iOS devices, try to add listener directly
-    if (typeof (DeviceOrientationEvent as any).requestPermission !== 'function') {
-      // Test if we can get orientation data
-      const testHandler = (event: DeviceOrientationEvent) => {
-        if (event.alpha !== null || event.beta !== null || event.gamma !== null) {
-          setGyroData(prev => ({ ...prev, permission: 'granted' }))
-          
-          if (!listenerAddedRef.current) {
-            window.addEventListener('deviceorientation', handleOrientation, true)
-            listenerAddedRef.current = true
-          }
-        }
-        window.removeEventListener('deviceorientation', testHandler)
-      }
-      
-      window.addEventListener('deviceorientation', testHandler, { once: true })
-      
-      // If no event fires within 1 second, assume not supported or needs permission
-      setTimeout(() => {
-        if (gyroData.permission === 'pending') {
-          // Keep as pending - user might need to interact first
-        }
-      }, 1000)
-    }
-
     return () => {
       if (listenerAddedRef.current) {
         window.removeEventListener('deviceorientation', handleOrientation, true)
         listenerAddedRef.current = false
       }
     }
-  }, [handleOrientation, gyroData.permission])
+  }, [handleOrientation])
 
   return {
     ...gyroData,
