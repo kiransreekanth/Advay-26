@@ -50,8 +50,10 @@ export function useDeviceDetect(): DeviceInfo {
       const hasGyroscope = 'DeviceOrientationEvent' in window
       
       // Low-end device detection (rough heuristic)
-      const isLowEnd = (navigator.hardwareConcurrency || 4) <= 2 || 
-                       (navigator.deviceMemory !== undefined && navigator.deviceMemory <= 2)
+      const hardwareConcurrency = navigator.hardwareConcurrency || 4
+      const deviceMemory = (navigator as any).deviceMemory
+      const isLowEnd = hardwareConcurrency <= 2 || 
+                       (deviceMemory !== undefined && deviceMemory <= 2)
 
       setDeviceInfo({
         isMobile,
